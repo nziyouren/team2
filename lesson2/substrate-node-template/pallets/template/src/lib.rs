@@ -141,6 +141,22 @@ decl_module! {
 
 		}
 
+		#[weight = 10_100]
+		pub fn revoke_claim(origin, proof: Vec<u8>) {
+
+			let sender = ensure_signed(origin)?;
+
+			ensure!(Proofs::<T>::contains_key(&proof), Error::<T>::NoSuchProof);
+
+			let (owner, _) = Proofs::<T>::get(&proof);
+
+			ensure!(sender == owner, Error::<T>::NotProofOwner);
+
+			Proofs::<T>::remove(&proof);
+
+			Self::deposit_event(RawEvent::ClaimRevoked(sender, proof));
+		}
+
 	}
 
 }
