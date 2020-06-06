@@ -56,6 +56,9 @@ decl_event!(
 
 		/// emit revoke claim event
 		ClaimRevoked(AccountId, Vec<u8>),
+
+		/// transfer claim to another account evnet
+		ClaimTransfered(AccountId, Vec<u8>),
 	}
 );
 
@@ -153,6 +156,32 @@ decl_module! {
 			ensure!(sender == owner, Error::<T>::NotProofOwner);
 
 			Proofs::<T>::remove(&proof);
+
+			Self::deposit_event(RawEvent::ClaimRevoked(sender, proof));
+		}
+
+		/// transfer a claim to another account. First verify and then transfer
+		#[weight = 10_100]
+		pub fn transfer_claim(origin, proof: Vec<u8>, account: <T as system::Trait>::AccountId) {
+
+			let sender = ensure_signed(origin)?;
+
+			// check if the proof is existed, or throw no such proof
+			ensure!(Proofs::<T>::contains_key(&proof), Error::<T>::NoSuchProof);
+
+			// verify if the account is the owner of proof ,or we throw a error
+			let (owner, _) = Proofs::<T>::get(&proof);
+
+			ensure!(sender == owner, Error::<T>::NotProofOwner);
+
+			// finally we can transfer the proof
+			let current_block = <system::Module<T>> :: block_number();
+
+			// first， we remove and then insert new account
+			Proofs::<T>::remove(&proof);
+			Proofs::<T>::insert(&proof,(&account, current_block));
+
+			// TODO, need to try use map mutate function directly, later
 
 			Self::deposit_event(RawEvent::ClaimRevoked(sender, proof));
 		}
