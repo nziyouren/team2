@@ -73,5 +73,46 @@ fn revoke_claim_not_owner() {
     })
 }
 
+//test case for transfer claim ok
+#[test]
+fn transfer_claim_ok() {
+    new_test_ext().execute_with(|| {
+        let claim = vec![0, 1, 2, 3];
+        let another_account = 2009;
+        //insert first time
+        let _ = PoeModule::create_claim(Origin::signed(1), claim.clone());
+        assert_ok!(PoeModule::transfer_claim(Origin::signed(1), claim.clone(), another_account));
+        assert_eq!(Proofs::<Test>::get(&claim), (another_account, system::Module::<Test>::block_number()));
+    })
+}
+
+//test case for transfer claim not exsited
+#[test]
+fn transfer_claim_not_exsited() {
+    new_test_ext().execute_with(|| {
+        let claim = vec![0, 1, 2, 3];
+        let fake_claim = vec![8;6];
+        let another_account = 2009;
+        //insert first time
+        let _ = PoeModule::create_claim(Origin::signed(1), claim.clone());
+        assert_noop!(PoeModule::transfer_claim(Origin::signed(1), fake_claim, another_account), Error::<Test>::ClaimNotExist);
+    })
+}
+
+//test case for transfer claim not claim owner
+#[test]
+fn transfer_claim_not_owner() {
+    new_test_ext().execute_with(|| {
+        let claim = vec![0, 1, 2, 3];
+        let fake_account = 2008;
+        let another_account = 2009;
+        //insert first time
+        let _ = PoeModule::create_claim(Origin::signed(1), claim.clone());
+        assert_noop!(PoeModule::transfer_claim(Origin::signed(fake_account), claim, another_account), Error::<Test>::NotClaimOwner);
+    })
+}
+
+
+
 
 
