@@ -14,3 +14,18 @@ fn create_claim_work() {
     })
 }
 
+//test case for claim already existed
+#[test]
+fn create_claim_alreay_existed() {
+    new_test_ext().execute_with(|| {
+        let claim = vec![0,1,2,3];
+        //insert first time
+        let _ = PoeModule::create_claim(Origin::signed(1), claim.clone());
+
+        //insert same claim again
+        assert_noop!(PoeModule::create_claim(Origin::signed(1), claim.clone()), Error::<Test>::ProofAlreadyExist);
+    })
+}
+
+
+
