@@ -27,5 +27,14 @@ fn create_claim_alreay_existed() {
     })
 }
 
+//test case for claim too long
+#[test]
+fn create_claim_too_long() {
+    new_test_ext().execute_with(|| {
+        let claim = vec![0,1,2,3,4,5,6];
+        assert_noop!(PoeModule::create_claim(Origin::signed(1), claim.clone()), Error::<Test>::ProofTooLong);
+    })
+}
+
 
 
