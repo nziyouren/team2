@@ -73,6 +73,12 @@ decl_module! {
 		pub fn transfer(origin, to: T::AccountId, kitty_id: T::KittyIndex) {
 			// 作业
 			let sender = ensure_signed(origin)?;
+
+			//check if kitty id exsited
+			ensure!(Kitties::<T>::contains_key(kitty_id), Error::<T>::InvalidKittyId);
+			//check owner
+			ensure!(OwnedKitties::<T>::contains_key((&sender, Some(kitty_id))), Error::<T>::RequireOwner);
+
 			//remove from original owner first
 			OwnedKitties::<T>::remove(&sender, kitty_id);
 			//then we apped to new owner
