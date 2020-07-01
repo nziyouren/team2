@@ -307,7 +307,6 @@ mod tests {
 	#[test]
 	fn owned_kitties_can_append_values() {
 		new_test_ext().execute_with(|| {
-
 			OwnedKittiesListTest::append(&0, 1);
 
 			assert_eq!(OwnedKittiesTest::get(&(0, None)), Some(LinkedItem {
@@ -364,57 +363,57 @@ mod tests {
 	#[test]
 	fn owned_kitties_can_remove_values() {
 		new_test_ext().execute_with(|| {
-			// OwnedKittiesListTest::append(&0, 1);
-			// OwnedKittiesListTest::append(&0, 2);
-			// OwnedKittiesListTest::append(&0, 3);
-			//
-			// OwnedKittiesListTest::remove(&0, 2);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, None)), Some(KittyLinkedItem {
-			// 	prev: Some(3),
-			// 	next: Some(1),
-			// }));
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(1))), Some(KittyLinkedItem {
-			// 	prev: None,
-			// 	next: Some(3),
-			// }));
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(2))), None);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(3))), Some(KittyLinkedItem {
-			// 	prev: Some(1),
-			// 	next: None,
-			// }));
-			//
-			// OwnedKittiesListTest::remove(&0, 1);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, None)), Some(KittyLinkedItem {
-			// 	prev: Some(3),
-			// 	next: Some(3),
-			// }));
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(1))), None);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(2))), None);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(3))), Some(KittyLinkedItem {
-			// 	prev: None,
-			// 	next: None,
-			// }));
-			//
-			// OwnedKittiesListTest::remove(&0, 3);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, None)), Some(KittyLinkedItem {
-			// 	prev: None,
-			// 	next: None,
-			// }));
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(1))), None);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(2))), None);
-			//
-			// assert_eq!(OwnedKittiesListTest::get(&(0, Some(2))), None);
+			OwnedKittiesListTest::append(&0, 1);
+			OwnedKittiesListTest::append(&0, 2);
+			OwnedKittiesListTest::append(&0, 3);
+
+			OwnedKittiesListTest::remove(&0, 2);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, None)), Some(KittyLinkedItem {
+				prev: Some(3),
+				next: Some(1),
+			}));
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(1))), Some(KittyLinkedItem {
+				prev: None,
+				next: Some(3),
+			}));
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(2))), None);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(3))), Some(KittyLinkedItem {
+				prev: Some(1),
+				next: None,
+			}));
+
+			OwnedKittiesListTest::remove(&0, 1);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, None)), Some(KittyLinkedItem {
+				prev: Some(3),
+				next: Some(3),
+			}));
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(1))), None);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(2))), None);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(3))), Some(KittyLinkedItem {
+				prev: None,
+				next: None,
+			}));
+
+			OwnedKittiesListTest::remove(&0, 3);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, None)), Some(KittyLinkedItem {
+				prev: None,
+				next: None,
+			}));
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(1))), None);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(2))), None);
+
+			assert_eq!(OwnedKittiesTest::get(&(0, Some(2))), None);
 		});
 	}
 }
