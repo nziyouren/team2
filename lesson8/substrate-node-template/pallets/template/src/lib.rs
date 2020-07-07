@@ -12,6 +12,41 @@
 use frame_support::{debug, decl_module, decl_storage, decl_event, decl_error, dispatch};
 use frame_system::{self as system, ensure_signed};
 
+use frame_system::{
+    offchain::{
+        AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer, SubmitTransaction,
+    },
+};
+use sp_core::crypto::keyTypeId;
+use sp_runtime::{
+    offchain as rt_offchain,
+    offchain::storage::StorageValueRef,
+    transaction_validity::{
+        InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
+        ValidTransaction,
+    },
+};
+
+
+pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"abcd");
+
+pub mod crypto {
+    use crate::KEY_TYPE;
+    use sp_core::sr25519::Signature as Sr25519Signature;
+    use sp_runtime::{app_crypto::{app_crypto, sr25519}, traits::Verify, MultiSignature, MultiSigner};
+
+    app_crypto!(sr25519, KEY_TYPE);
+
+    pub struct TestAuthId;
+
+    // implemented for ocw-runtime
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
+        type RuntimeAppPublic = Public;
+        type GenericPublic = sp_core::sr25519::Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+    }
+}
+
 #[cfg(test)]
 mod mock;
 
@@ -19,11 +54,14 @@ mod mock;
 mod tests;
 
 /// The pallet's configuration trait.
-pub trait Trait: system::Trait {
-	// Add other types and constants required to configure this pallet.
+pub trait Trait: system::Trait + CreateSignedTransaction<Call<Self>> {
+    // Add other types and constants required to configure this pallet.
 
-	/// The overarching event type.
-	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    /// The overarching event type.
+    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    type Call: From<Call<Self>>;
+    /// The identifier type for an offchain worker.
+    type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 }
 
 // This pallet's storage items.
