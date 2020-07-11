@@ -1,6 +1,6 @@
-use codec::{Decode, Encode};
-use frame_support::{Parameter, StorageMap};
+use frame_support::{StorageMap, Parameter};
 use sp_runtime::traits::Member;
+use codec::{Encode, Decode};
 
 #[cfg_attr(feature = "std", derive(Debug, PartialEq, Eq))]
 #[derive(Encode, Decode)]
@@ -11,8 +11,7 @@ pub struct LinkedItem<Value> {
 
 pub struct LinkedList<Storage, Key, Value>(sp_std::marker::PhantomData<(Storage, Key, Value)>);
 
-impl<Storage, Key, Value> LinkedList<Storage, Key, Value>
-where
+impl<Storage, Key, Value> LinkedList<Storage, Key, Value> where
 	Value: Parameter + Member + Copy,
 	Key: Parameter,
 	Storage: StorageMap<(Key, Option<Value>), LinkedItem<Value>, Query = Option<LinkedItem<Value>>>,
@@ -37,45 +36,10 @@ where
 	}
 
 	pub fn append(key: &Key, value: Value) {
-		let head = Self::read_head(key);
-		let new_head = LinkedItem {
-			prev: Some(value),
-			next: head.next,
-		};
-
-		Self::write_head(key, new_head);
-
-		let prev = Self::read(key, head.prev);
-		let new_prev = LinkedItem {
-			prev: prev.prev,
-			next: Some(value),
-		};
-		Self::write(key, head.prev, new_prev);
-
-		let item = LinkedItem {
-			prev: head.prev,
-			next: None,
-		};
-		Self::write(key, Some(value), item);
+        // 作业
 	}
 
 	pub fn remove(key: &Key, value: Value) {
-		if let Some(item) = Storage::take((&key, Some(value))) {
-			let prev = Self::read(key, item.prev);
-			let new_prev = LinkedItem {
-				prev: prev.prev,
-				next: item.next,
-			};
-
-			Self::write(key, item.prev, new_prev);
-
-			let next = Self::read(key, item.next);
-			let new_next = LinkedItem {
-				prev: item.prev,
-				next: next.next,
-			};
-
-			Self::write(key, item.next, new_next);
-		}
+        // 作业
 	}
-}
+ }
