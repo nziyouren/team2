@@ -11,11 +11,11 @@
 
 use frame_support::{debug, decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get, dispatch::DispatchResult};
 use frame_system::{self as system, ensure_signed,
-				   offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer}, };
+                   offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer}, };
 use sp_std::prelude::*;
 use sp_core::crypto::KeyTypeId;
 use sp_runtime::{
-	transaction_validity::{TransactionPriority},
+    transaction_validity::{TransactionPriority},
 };
 use core::convert::TryInto;
 
@@ -30,47 +30,48 @@ mod tests;
 pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"demo");
 
 pub mod crypto {
-	use crate::KEY_TYPE;
-	use sp_core::sr25519::Signature as Sr25519Signature;
+    use crate::KEY_TYPE;
+    use sp_core::sr25519::Signature as Sr25519Signature;
 
-	use sp_runtime::{
-		app_crypto::{app_crypto, sr25519},
-		traits::Verify,
-		MultiSignature, MultiSigner,
-	};
+    use sp_runtime::{
+        app_crypto::{app_crypto, sr25519},
+        traits::Verify,
+        MultiSignature, MultiSigner,
+    };
 
-	app_crypto!(sr25519, KEY_TYPE);
+    app_crypto!(sr25519, KEY_TYPE);
 
-	pub struct TestAuthId;
-	// implemented for ocw-runtime
-	impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
-		type RuntimeAppPublic = Public;
-		type GenericPublic = sp_core::sr25519::Public;
-		type GenericSignature = sp_core::sr25519::Signature;
-	}
+    pub struct TestAuthId;
 
-	// implemented for mock runtime in test
-	impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
-	for TestAuthId
-	{
-		type RuntimeAppPublic = Public;
-		type GenericPublic = sp_core::sr25519::Public;
-		type GenericSignature = sp_core::sr25519::Signature;
-	}
+    // implemented for ocw-runtime
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for TestAuthId {
+        type RuntimeAppPublic = Public;
+        type GenericPublic = sp_core::sr25519::Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+    }
+
+    // implemented for mock runtime in test
+    impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
+    for TestAuthId
+    {
+        type RuntimeAppPublic = Public;
+        type GenericPublic = sp_core::sr25519::Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+    }
 }
 
 /// The pallet's configuration trait.
-pub trait Trait: system::Trait + CreateSignedTransaction<Call<Self>>{
-	// Add other types and constants required to configure this pallet.
+pub trait Trait: system::Trait + CreateSignedTransaction<Call<Self>> {
+    // Add other types and constants required to configure this pallet.
 
-	/// The overarching event type.
-	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-	/// The identifier type for an offchain worker.
-	type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
-	/// The overarching dispatch call type.
-	type Call: From<Call<Self>>;
-	/// The type to sign and send transactions.
-	type UnsignedPriority: Get<TransactionPriority>;
+    /// The overarching event type.
+    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    /// The identifier type for an offchain worker.
+    type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+    /// The overarching dispatch call type.
+    type Call: From<Call<Self>>;
+    /// The type to sign and send transactions.
+    type UnsignedPriority: Get<TransactionPriority>;
 }
 
 // This pallet's storage items.
@@ -125,6 +126,13 @@ decl_module! {
 		// this is needed only if you are using events in your pallet
 		fn deposit_event() = default;
 
+        #[weight = 10_000]
+        pub fn submit_number_signed(origin, number: u32) -> dispatch::DispatchResult {
+            debug::info!("submit_number_signed: {:?}", number);
+            let who = ensure_signed(origin.clone())?;
+            return Self::save_number(origin, number);
+        }
+
 		#[weight = 10_000]
 		pub fn save_number(origin, number: u32) -> dispatch::DispatchResult {
 			// Check it was signed and get the signer. See also: ensure_root and ensure_none
@@ -143,12 +151,37 @@ decl_module! {
 			/*******
 			 * 学员们在这里追加逻辑
 			 *******/
+			 Self::signed_submit_number(block_number);
 		}
 
 	}
 }
 
 
-impl<T:Trait> Module<T> {
+impl<T: Trait> Module<T> {
+    fn signed_submit_number(block_number: T::BlockNumber) -> Result<(), Error<T>> {
+        // 2.1 取得 Signer
+        let signer = Signer::<T, T::AuthorityId>::all_accounts();
 
+        // 2.2 用 Signer 调用 send_signed_transaction
+        let results = signer.send_signed_transaction(|_acct| {
+            // We are just submitting the current block number back on-chain
+            Call::submit_number_signed(1 as u32)
+        });
+
+        // 2.3 查看提交交易结果
+        for (acc, res) in &results {
+            return match res {
+                Ok(()) => {
+                    debug::native::info!("success");
+                    Ok(())
+                }
+                Err(e) => {
+                    debug::error!("error");
+                    Err(<Error<T>>::SubmitNumberSignedError)
+                }
+            };
+        }
+        Ok(())
+    }
 }
