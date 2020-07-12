@@ -9,14 +9,25 @@
 /// For more guidance on Substrate FRAME, see the example pallet
 /// https://github.com/paritytech/substrate/blob/master/frame/example/src/lib.rs
 
-use frame_support::{debug, decl_module, decl_storage, decl_event, decl_error, dispatch};
-use frame_system::{self as system, ensure_signed};
+use frame_support::{debug, decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get, dispatch::DispatchResult};
+use frame_system::{self as system, ensure_signed,
+				   offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer}, };
+use sp_std::prelude::*;
+use sp_core::crypto::KeyTypeId;
+use sp_runtime::{
+	transaction_validity::{TransactionPriority},
+};
+use core::convert::TryInto;
+
 
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
+
+//This is the application key to be used as the prefix for this pallet in underlying storage.
+pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"demo");
 
 /// The pallet's configuration trait.
 pub trait Trait: system::Trait {
