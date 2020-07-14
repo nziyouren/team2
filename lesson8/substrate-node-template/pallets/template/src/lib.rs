@@ -165,17 +165,14 @@ impl<T: Trait> Module<T> {
         let signer = Signer::<T, T::AuthorityId>::all_accounts();
 
         //计算值
-        let original_value = Number::get();
-
-        debug::native::info!("original_value is: {:?}",original_value);
-
-        let latest_value;
-        match original_value {
-            Some(x) => latest_value = x,
-            _ => latest_value = 0,
+        let mut latest_value: u64 = 0;
+        if let Some(latest_value) = Number::get() {
+            debug::native::info!("we got value: {}, do nothing", latest_value);
+        } else {
+            latest_value = 0;
         }
 
-        debug::native::info!("latest_value is: {}",latest_value);
+        debug::native::info!("latest_value is: {}", latest_value);
 
         let index: u64 = block_number.try_into().ok().unwrap() as u64;
         let final_number = latest_value.saturating_add((index+1).saturating_pow(2));
