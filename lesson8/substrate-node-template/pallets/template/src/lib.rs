@@ -166,13 +166,21 @@ impl<T: Trait> Module<T> {
 
         //计算值
         let original_value = Number::get();
+
+        debug::native::info!("original_value is: {:?}",original_value);
+
         let latest_value;
         match original_value {
             Some(x) => latest_value = x,
-            None => latest_value = 0,
+            _ => latest_value = 0,
         }
+
+        debug::native::info!("latest_value is: {}",latest_value);
+
         let index: u64 = block_number.try_into().ok().unwrap() as u64;
         let final_number = latest_value.saturating_add((index+1).saturating_pow(2));
+
+        debug::native::info!("block number: {}, final_number: {}",block_number, final_number);
 
         // 2.2 用 Signer 调用 send_signed_transaction
         let results = signer.send_signed_transaction(|_acct| {

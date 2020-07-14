@@ -192,19 +192,16 @@ pub fn new_full(config: Configuration) -> Result<impl AbstractService, ServiceEr
 
 
 	// Initialize seed for signing transaction using off-chain workers
-	#[cfg(feature = "ocw")]
-		{
-			if let Some(seed) = dev_seed {
-				service
-					.keystore()
-					.write()
-					.insert_ephemeral_from_seed_by_type::<node_template_runtime::template::crypto::Pair>(
-						&seed,
-						node_template_runtime::template::KEY_TYPE,
-					)
-					.expect("Dev Seed should always succeed.");
-			}
-		}
+	if let Some(seed) = dev_seed {
+		service
+			.keystore()
+			.write()
+			.insert_ephemeral_from_seed_by_type::<node_template_runtime::template::crypto::Pair>(
+				&seed,
+				node_template_runtime::template::KEY_TYPE,
+			)
+			.expect("Dev Seed should always succeed.");
+	}
 
 	Ok(service)
 }
