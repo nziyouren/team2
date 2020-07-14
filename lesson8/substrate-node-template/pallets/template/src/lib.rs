@@ -14,10 +14,9 @@ use frame_system::{self as system, ensure_signed,
                    offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer}, };
 use sp_std::prelude::*;
 use sp_core::crypto::KeyTypeId;
-use sp_runtime::{
-    transaction_validity::{TransactionPriority},
-};
+use sp_runtime::{transaction_validity::{TransactionPriority}, SaturatedConversion};
 use core::convert::TryInto;
+use sp_runtime::traits::Saturating;
 
 
 #[cfg(test)]
@@ -85,7 +84,7 @@ decl_storage! {
 		// `get(fn something)` is the default getter which returns either the stored `u32` or `None` if nothing stored
 		Something get(fn something): Option<u32>;
 
-		Number get(fn number):  Option<u32>;
+		Number get(fn number):  Option<u64>;
 	}
 }
 
@@ -127,20 +126,22 @@ decl_module! {
 		fn deposit_event() = default;
 
         #[weight = 10_000]
-        pub fn submit_number_signed(origin, number: u32) -> dispatch::DispatchResult {
+        pub fn submit_number_signed(origin, number: u64) -> dispatch::DispatchResult {
             debug::info!("submit_number_signed: {:?}", number);
             let who = ensure_signed(origin.clone())?;
             return Self::save_number(origin, number);
         }
 
 		#[weight = 10_000]
-		pub fn save_number(origin, number: u32) -> dispatch::DispatchResult {
+		pub fn save_number(origin, number: u64) -> dispatch::DispatchResult {
 			// Check it was signed and get the signer. See also: ensure_root and ensure_none
 			let who = ensure_signed(origin)?;
 
 			/*******
 			 * 学员们在这里追加逻辑
 			 *******/
+
+			Number::put(number);
 
 			Ok(())
 		}
@@ -163,10 +164,20 @@ impl<T: Trait> Module<T> {
         // 2.1 取得 Signer
         let signer = Signer::<T, T::AuthorityId>::all_accounts();
 
+        //计算值
+        let original_value = Number::get();
+        let latest_value;
+        match original_value {
+            Some(x) => latest_value = x,
+            None => latest_value = 0,
+        }
+        let index: u64 = block_number.try_into().ok().unwrap() as u64;
+        let final_number = latest_value.saturating_add((index+1).saturating_pow(2));
+
         // 2.2 用 Signer 调用 send_signed_transaction
         let results = signer.send_signed_transaction(|_acct| {
             // We are just submitting the current block number back on-chain
-            Call::submit_number_signed(1 as u32)
+            Call::submit_number_signed(final_number)
         });
 
         // 2.3 查看提交交易结果
