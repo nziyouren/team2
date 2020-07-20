@@ -14,9 +14,19 @@ use frame_system::{self as system, ensure_signed,
                    offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer}, };
 use sp_std::prelude::*;
 use sp_core::crypto::KeyTypeId;
-use sp_runtime::{transaction_validity::{TransactionPriority}, SaturatedConversion};
+use sp_runtime::{
+    offchain,
+    offchain::storage::StorageValueRef,
+    transaction_validity::{TransactionPriority}, SaturatedConversion};
 use core::convert::TryInto;
 use sp_runtime::traits::Saturating;
+
+use sp_std::prelude::*;
+use sp_std::str;
+
+// We use `alt_serde`, and Xanewok-modified `serde_json` so that we can compile the program
+//   with serde(features `std`) and alt_serde(features `no_std`).
+use alt_serde::{Deserialize, Deserializer};
 
 
 #[cfg(test)]
@@ -27,6 +37,9 @@ mod tests;
 
 //This is the application key to be used as the prefix for this pallet in underlying storage.
 pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"demo");
+
+pub const HTTP_REMOTE_COIN_CAP_URL_BYTES: &[u8] = b"https://api.coincap.io/v2/assets/ethereum";
+pub const HTTP_REMOTE_CRYPT_COIN_URL_BYTES: &[u8] = b"";
 
 pub mod crypto {
     use crate::KEY_TYPE;
@@ -107,8 +120,9 @@ decl_error! {
 		NoneValue,
 		/// Value reached maximum and cannot be incremented further
 		StorageOverflow,
-
 		SubmitNumberSignedError,
+		// Error returned when making remote http fetching
+		HttpFetchingError,
 	}
 }
 
@@ -199,5 +213,37 @@ impl<T: Trait> Module<T> {
             };
         }
         Ok(())
+    }
+
+    fn fetch_coin_price() -> Result<f32, Error<T>> {
+        let remote_coin_cap_url_bytes = HTTP_REMOTE_COIN_CAP_URL_BYTES.to_vec();
+        let remote_url =
+            str::from_utf8(&remote_coin_cap_url_bytes).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        debug::info!("sending request to: {}", remote_url);
+
+        // Initiate an external HTTP GET request. This is using high-level wrappers from `sp_runtime`.
+        let request = offchain::http::Request::get(remote_url);
+
+        // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
+        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(3000));
+
+        let pending = request
+            .deadline(timeout) // Setting the timeout time
+            .send() // Sending the request out by the host
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        let response = pending
+            .try_wait(timeout)
+            .map_err(|_| <Error<T>>::HttpFetchingError)?
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        if response.code != 200 {
+            debug::error!("Unexpected http request status code: {}", response.code);
+            return Err(<Error<T>>::HttpFetchingError);
+        } else {
+            debug::info!("get response: {:?}", response.body());
+        }
+
+        Ok(12 as f32)
     }
 }
