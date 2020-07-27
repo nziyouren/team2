@@ -216,11 +216,7 @@ decl_module! {
 
 		fn offchain_worker(block_number: T::BlockNumber) {
 			debug::info!("Entering off-chain workers");
-
-			/*******
-			 * 学员们在这里追加逻辑
-			 *******/
-			 Self::signed_submit_number(block_number);
+			Self::fetch_coin_price();
 		}
 
 	}
@@ -330,6 +326,13 @@ impl<T: Trait> Module<T> {
                 debug::info!("coin cap resp: {}", coin_cap_resp_str);
                 debug::info!("coin gecko resp: {}", coin_gecko_resp_str);
 
+                let coin_cap_info: CoinCapInfo = serde_json::from_str(&coin_cap_resp_str).map_err(|_| <Error<T>>::HttpFetchingError)?;
+                let eth_price_1 = coin_cap_info.data.priceUsd;
+
+                let coin_gecko_info: CoinGeckoInfo = serde_json::from_str(&coin_gecko_resp_str).map_err(|_| <Error<T>>::HttpFetchingError)?;
+                let eth_price_2 = coin_gecko_info.ethereum.usd;
+
+                debug::info!("coin cap price1: {}, price2: {}", eth_price_1, eth_price_2);
             } else {
                 debug::error!("Coin cap or coin gecko unexpected http request status code: coin_cap_code: {}, coin_gecko_code: {}", coin_cap_response.code, coin_gecko_response.code);
             }
