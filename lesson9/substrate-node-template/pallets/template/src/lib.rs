@@ -12,6 +12,7 @@
 use frame_support::{debug, decl_module, decl_storage, decl_event, decl_error, dispatch, traits::Get, dispatch::DispatchResult};
 use frame_system::{self as system, ensure_signed,
                    offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer}, };
+use parity_scale_codec::{Decode, Encode};
 use sp_std::prelude::*;
 use sp_core::crypto::KeyTypeId;
 use sp_runtime::{
@@ -72,6 +73,57 @@ pub mod crypto {
         type GenericPublic = sp_core::sr25519::Public;
         type GenericSignature = sp_core::sr25519::Signature;
     }
+}
+
+// Specifying serde path as `alt_serde`
+// ref: https://serde.rs/container-attrs.html#crate
+#[serde(crate = "alt_serde")]
+#[derive(Deserialize, Encode, Decode, Default)]
+struct CoinCapInfo {
+    data: DataInfo,
+    timestamp: u32,
+}
+
+#[serde(crate = "alt_serde")]
+#[derive(Deserialize, Encode, Decode, Default)]
+struct DataInfo {
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    id: Vec<u8>,
+    rank: u32,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    symbol: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    name: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    supply: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    maxSupply: Vec<u8>,
+    marketCapUsd: u32,
+    volumeUsd24Hr: u32,
+    priceUsd: u32,
+    changePercent24Hr: u32,
+    vwap24Hr: u32,
+}
+
+
+#[serde(crate = "alt_serde")]
+#[derive(Deserialize, Encode, Decode, Default)]
+struct CoinGeckoInfo {
+    ethereum: GeckPriceInfo
+}
+
+#[serde(crate = "alt_serde")]
+#[derive(Deserialize, Encode, Decode, Default)]
+struct GeckPriceInfo {
+    usd: u32,
+}
+
+pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+{
+    let s: &str = Deserialize::deserialize(de)?;
+    Ok(s.as_bytes().to_vec())
 }
 
 /// The pallet's configuration trait.

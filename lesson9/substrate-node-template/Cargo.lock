@@ -2947,6 +2947,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "parity-scale-codec",
+ "parking_lot 0.10.2",
  "serde_json 1.0.44",
  "sp-core",
  "sp-io",
