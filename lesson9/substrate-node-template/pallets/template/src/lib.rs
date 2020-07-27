@@ -27,6 +27,7 @@ use sp_std::str;
 // We use `alt_serde`, and Xanewok-modified `serde_json` so that we can compile the program
 //   with serde(features `std`) and alt_serde(features `no_std`).
 use alt_serde::{Deserialize, Deserializer};
+use sp_runtime::offchain::http::PendingRequest;
 
 
 #[cfg(test)]
@@ -39,6 +40,7 @@ mod tests;
 pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"demo");
 
 pub const HTTP_REMOTE_COIN_CAP_URL_BYTES: &[u8] = b"https://api.coincap.io/v2/assets/ethereum";
+pub const HTTP_REMOTE_COIN_GECKO_URL_BYTES: &[u8] = b"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd";
 pub const HTTP_REMOTE_CRYPT_COIN_URL_BYTES: &[u8] = b"";
 
 pub mod crypto {
@@ -215,33 +217,70 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn fetch_coin_price() -> Result<f32, Error<T>> {
-        let remote_coin_cap_url_bytes = HTTP_REMOTE_COIN_CAP_URL_BYTES.to_vec();
-        let remote_url =
-            str::from_utf8(&remote_coin_cap_url_bytes).map_err(|_| <Error<T>>::HttpFetchingError)?;
+    //构造请求组
+    fn build_coin_request(url_bytes: &[u8]) -> Result<PendingRequest, Error<T>> {
+        // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
+        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(3000));
+
+        let remote_url_bytes = url_bytes.to_vec();
+        let remote_url = str::from_utf8(&remote_url_bytes)
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
         debug::info!("sending request to: {}", remote_url);
 
         // Initiate an external HTTP GET request. This is using high-level wrappers from `sp_runtime`.
         let request = offchain::http::Request::get(remote_url);
 
-        // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
-        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(3000));
-
-        let pending = request
+        let pending_request = request
             .deadline(timeout) // Setting the timeout time
             .send() // Sending the request out by the host
             .map_err(|_| <Error<T>>::HttpFetchingError)?;
 
-        let response = pending
-            .try_wait(timeout)
-            .map_err(|_| <Error<T>>::HttpFetchingError)?
-            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+        Ok(pending_request)
 
-        if response.code != 200 {
-            debug::error!("Unexpected http request status code: {}", response.code);
-            return Err(<Error<T>>::HttpFetchingError);
+    }
+
+    fn fetch_coin_price() -> Result<f32, Error<T>> {
+
+        // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
+        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(3000));
+
+        let coin_cap_pending_request = Self::build_coin_request(HTTP_REMOTE_COIN_CAP_URL_BYTES).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        let coin_gecko_request = Self::build_coin_request(HTTP_REMOTE_COIN_GECKO_URL_BYTES).map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        let mut request_vec = Vec::<PendingRequest>::new();
+        request_vec.push(coin_cap_pending_request);
+        request_vec.push(coin_gecko_request);
+
+        let mut result_vec = PendingRequest::try_wait_all(request_vec, timeout);
+
+        //检查返回结果
+        if result_vec.len() == 0 {
+            //返回错误
         } else {
-            debug::info!("get response: {:?}", response.body());
+            //取得第一个结果
+            let coin_cap_response = result_vec.remove(0)
+                .map_err(|_| <Error<T>>::HttpFetchingError)?
+                .map_err(|_| <Error<T>>::HttpFetchingError)?;
+            //取得第二个结果
+            let coin_gecko_response = result_vec.remove(0)
+                .map_err(|_| <Error<T>>::HttpFetchingError)?
+                .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+            if coin_cap_response.code == 200 && coin_gecko_response.code == 200 {
+                //必须两个都为200 OK才行
+                let coin_cap_result_bytes = coin_cap_response.body().collect::<Vec<u8>>();
+                let coin_gecko_result_bytes = coin_gecko_response.body().collect::<Vec<u8>>();
+
+                let coin_cap_resp_str = str::from_utf8(&coin_cap_result_bytes).map_err(|_| <Error<T>>::HttpFetchingError)?;
+                let coin_gecko_resp_str = str::from_utf8(&coin_gecko_result_bytes).map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+                // Print out our fetched JSON string
+                debug::info!("coin cap resp: {}", coin_cap_resp_str);
+                debug::info!("coin gecko resp: {}", coin_gecko_resp_str);
+
+            } else {
+                debug::error!("Coin cap or coin gecko unexpected http request status code: coin_cap_code: {}, coin_gecko_code: {}", coin_cap_response.code, coin_gecko_response.code);
+            }
         }
 
         Ok(12 as f32)
