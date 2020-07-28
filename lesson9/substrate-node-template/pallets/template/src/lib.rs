@@ -16,7 +16,9 @@ use sp_std::prelude::*;
 use sp_core::crypto::KeyTypeId;
 use sp_runtime::{
     offchain,
-    offchain::storage::StorageValueRef,
+    offchain::{
+        storage::StorageValueRef,
+    },
     transaction_validity::{TransactionPriority}, SaturatedConversion};
 use core::convert::TryInto;
 use sp_runtime::traits::Saturating;
@@ -42,6 +44,10 @@ pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"demo");
 pub const HTTP_REMOTE_COIN_CAP_URL_BYTES: &[u8] = b"https://api.coincap.io/v2/assets/ethereum";
 pub const HTTP_REMOTE_COIN_GECKO_URL_BYTES: &[u8] = b"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd";
 pub const HTTP_REMOTE_CRYPT_COIN_URL_BYTES: &[u8] = b"";
+
+pub const FETCH_TIMEOUT_PERIOD: u64 = 6000; // in milli-seconds
+pub const LOCK_TIMEOUT_EXPIRATION: u64 = FETCH_TIMEOUT_PERIOD + 1000; // in milli-seconds
+pub const LOCK_BLOCK_EXPIRATION: u32 = 3; // in block number
 
 pub mod crypto {
     use crate::KEY_TYPE;
@@ -185,30 +191,18 @@ decl_module! {
 		// this is needed only if you are using events in your pallet
 		fn deposit_event() = default;
 
-        #[weight = 10_000]
-        pub fn submit_number_signed(origin, number: u64) -> dispatch::DispatchResult {
-            debug::info!("submit_number_signed: {:?}", number);
-            let who = ensure_signed(origin.clone())?;
-            return Self::save_number(origin, number);
-        }
-
-		#[weight = 10_000]
-		pub fn save_number(origin, number: u64) -> dispatch::DispatchResult {
-			// Check it was signed and get the signer. See also: ensure_root and ensure_none
-			let who = ensure_signed(origin)?;
-
-			/*******
-			 * 学员们在这里追加逻辑
-			 *******/
-
-			Number::put(number);
-
-			Ok(())
-		}
-
 		fn offchain_worker(block_number: T::BlockNumber) {
 			debug::info!("Entering off-chain workers");
-			Self::fetch_coin_price();
+			let price_result = Self::fetch_coin_price();
+			match price_result {
+			    Ok(price) => {
+			        debug::info!("offchain_worker begin to invoke save price: {}", price);
+                    Self::save_price(price);
+			    }
+			    Err(err) => {
+			        debug::error!("offchain_worker get error: {:?}", err);
+			    }
+			}
 		}
 
 	}
@@ -216,51 +210,25 @@ decl_module! {
 
 
 impl<T: Trait> Module<T> {
-    fn signed_submit_number(block_number: T::BlockNumber) -> Result<(), Error<T>> {
-        // 2.1 取得 Signer
-        let signer = Signer::<T, T::AuthorityId>::all_accounts();
+    fn save_price(price: u64) {
+        debug::info!("save price to storage: {}", price);
+        let price_info = StorageValueRef::persistent(b"offchain-demo::price-info");
+        let mut price_vec = Vec::<u64>::new();
 
-        //计算值
-        let mut latest_value: u64 = 0;
-        if let Some(latest_value) = Number::get() {
-            debug::native::info!("we got value: {}, do nothing", latest_value);
-        } else {
-            latest_value = 0;
+        if let Some(Some(original_price_vec)) = price_info.get::<Vec<u64>>() {
+            debug::info!("get original price vec>>>>");
+            price_vec = original_price_vec;
         }
-
-        debug::native::info!("latest_value is: {}", latest_value);
-
-        let index: u64 = block_number.try_into().ok().unwrap() as u64;
-        let final_number = latest_value.saturating_add((index+1).saturating_pow(2));
-
-        debug::native::info!("block number: {}, final_number: {}",block_number, final_number);
-
-        // 2.2 用 Signer 调用 send_signed_transaction
-        let results = signer.send_signed_transaction(|_acct| {
-            // We are just submitting the current block number back on-chain
-            Call::submit_number_signed(final_number)
-        });
-
-        // 2.3 查看提交交易结果
-        for (acc, res) in &results {
-            return match res {
-                Ok(()) => {
-                    debug::native::info!("success");
-                    Ok(())
-                }
-                Err(e) => {
-                    debug::error!("error");
-                    Err(<Error<T>>::SubmitNumberSignedError)
-                }
-            };
-        }
-        Ok(())
+        debug::info!("push new price to vec and set to storage>>>>");
+        price_vec.push(price);
+        debug::info!("now the price vec values: {:?}", price_vec);
+        price_info.set(&price_vec);
     }
 
     //构造请求组
     fn build_coin_request(url_bytes: &[u8]) -> Result<PendingRequest, Error<T>> {
         // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
-        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(3000));
+        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
 
         let remote_url_bytes = url_bytes.to_vec();
         let remote_url = str::from_utf8(&remote_url_bytes)
@@ -279,10 +247,10 @@ impl<T: Trait> Module<T> {
 
     }
 
-    fn fetch_coin_price() -> Result<f32, Error<T>> {
+    fn fetch_coin_price() -> Result<u64, Error<T>> {
 
         // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
-        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(3000));
+        let timeout = sp_io::offchain::timestamp().add(offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
 
         let coin_cap_pending_request = Self::build_coin_request(HTTP_REMOTE_COIN_CAP_URL_BYTES).map_err(|_| <Error<T>>::HttpFetchingError)?;
         let coin_gecko_request = Self::build_coin_request(HTTP_REMOTE_COIN_GECKO_URL_BYTES).map_err(|_| <Error<T>>::HttpFetchingError)?;
@@ -299,7 +267,9 @@ impl<T: Trait> Module<T> {
         if result_vec.len() == 0 {
             //返回错误
             debug::error!("result vec is 0>>>>>");
+            return Err(<Error<T>>::HttpFetchingError);
         } else {
+            debug::info!("begin to parse response>>>>");
             //取得第一个结果
             let coin_cap_response = result_vec.remove(0)
                 .map_err(|_| <Error<T>>::HttpFetchingError)?
@@ -327,17 +297,20 @@ impl<T: Trait> Module<T> {
                 debug::info!("coin gecko resp: {}", coin_gecko_resp_str);
 
                 let coin_cap_info: CoinCapInfo = serde_json::from_str(&coin_cap_resp_str).map_err(|_| <Error<T>>::HttpFetchingError)?;
-                let eth_price_1 = coin_cap_info.data.priceUsd;
+                let eth_price_1 = coin_cap_info.data.priceUsd as u64;
 
                 let coin_gecko_info: CoinGeckoInfo = serde_json::from_str(&coin_gecko_resp_str).map_err(|_| <Error<T>>::HttpFetchingError)?;
-                let eth_price_2 = coin_gecko_info.ethereum.usd;
+                let eth_price_2 = coin_gecko_info.ethereum.usd as u64;
 
                 debug::info!("coin cap price1: {}, price2: {}", eth_price_1, eth_price_2);
+
+                let final_price = (eth_price_1 + eth_price_2) / 2;
+
+                return Ok(final_price);
             } else {
                 debug::error!("Coin cap or coin gecko unexpected http request status code: coin_cap_code: {}, coin_gecko_code: {}", coin_cap_response.code, coin_gecko_response.code);
+                return Err(<Error<T>>::HttpFetchingError);
             }
         }
-
-        Ok(12 as f32)
     }
 }
