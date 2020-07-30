@@ -14,6 +14,14 @@ features = ['derive']
 package = 'parity-scale-codec'
 version = '1.3.0'
 
+[dependencies]
+# external dependencies
+parking_lot = "0.10.0"
+alt_serde = { version = "1", default-features = false, features = ["derive"] }
+# `alt_serde_json` is not updated. This customized one has latest alloc feature and pull in `alt_serde`.
+serde_json = { version = "1", default-features = false, git = "https://github.com/Xanewok/json", branch = "no-std", features = ["alloc"] }
+
+
 [dependencies.frame-support]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -21,6 +29,30 @@ tag = 'v2.0.0-rc2'
 version = '2.0.0-rc2'
 
 [dependencies.frame-system]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc2'
+version = '2.0.0-rc2'
+
+[dependencies.sp-core]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc2'
+version = '2.0.0-rc2'
+
+[dependencies.sp-io]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc2'
+version = '2.0.0-rc2'
+
+[dependencies.sp-runtime]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'v2.0.0-rc2'
+version = '2.0.0-rc2'
+
+[dependencies.sp-std]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'v2.0.0-rc2'
@@ -50,4 +82,8 @@ std = [
     'codec/std',
     'frame-support/std',
     'frame-system/std',
+    'sp-core/std',
+        'sp-io/std',
+    	'sp-runtime/std',
+        'sp-std/std',
 ]

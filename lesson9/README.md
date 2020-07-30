@@ -14,3 +14,21 @@
 **(3 分)** 
 
 附加题：为你的 ocw 写单元测试
+
+coincap:
+{
+    "data":{
+        "id":"ethereum",
+        "rank":"2",
+        "symbol":"ETH",
+        "name":"Ethereum",
+        "supply":"111837254.2490000000000000",
+        "maxSupply":null,
+        "marketCapUsd":"26636475399.5136100069260518",
+        "volumeUsd24Hr":"1078370273.6335106592245216",
+        "priceUsd":"238.1717575094327905",
+        "changePercent24Hr":"1.7488000276419087",
+        "vwap24Hr":"237.8206683612338757"
+    },
+    "timestamp":1595260763853
+}
