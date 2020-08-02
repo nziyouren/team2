@@ -5,44 +5,93 @@ use ink_lang as ink;
 #[ink::contract(version = "0.1.0")]
 mod erc20 {
     use ink_core::storage;
+    use ink_core::env::AccountId;
 
     /// Defines the storage of your contract.
     /// Add new fields to the below struct in order
     /// to add new static storage fields to your contract.
     #[ink(storage)]
     struct Erc20 {
-        /// Stores a single `bool` value on the storage.
-        value: storage::Value<bool>,
+        /// 总供应量
+        total_supply: storage::Value<Balance>,
+        /// 每个账户的余额
+        balances: storage::HashMap<AccountId, Balance>,
+    }
+
+    /// 合约初始化事件
+    #[ink(event)]
+    struct ContractNew {
+        #[ink(topic)]
+        creator: Option<AccountId>,
+    }
+
+    /// 转移事件
+    #[ink(event)]
+    struct Transfer {
+        #[ink(topic)]
+        from: Option<AccountId>,
+        #[ink(topic)]
+        to: Option<AccountId>,
+        value: Balance,
     }
 
     impl Erc20 {
-        /// Constructor that initializes the `bool` value to the given `init_value`.
+
         #[ink(constructor)]
-        fn new(&mut self, init_value: bool) {
-            self.value.set(init_value);
+        fn new(&mut self, init_supply: Balance) {
+            let caller = self.env().caller();
+            self.total_supply.set(init_supply);
+            self.balances.insert(caller, &self.total_supply);
+            self.env().emit_event(Transfer {
+                from: None,
+                to: Some(caller),
+                value: &self.total_supply,
+            });
+            self.env().emit_event(ContractNew {
+                creator: caller
+            })
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
-        /// Constructors can delegate to other constructors.
-        #[ink(constructor)]
-        fn default(&mut self) {
-            self.new(false)
-        }
-
-        /// A message that can be called on instantiated contracts.
-        /// This one flips the value of the stored `bool` from `true`
-        /// to `false` and vice versa.
         #[ink(message)]
-        fn flip(&mut self) {
-            *self.value = !self.get();
+        fn total_supply(&self) -> Balance {
+            *self.total_supply
         }
 
-        /// Simply returns the current value of our `bool`.
         #[ink(message)]
-        fn get(&self) -> bool {
-            *self.value
+        fn balance_of(&self, owner: AccountId) -> Balance {
+            self.balance_of_or_zero(&owner)
         }
+
+        fn balance_of_or_zero(&self, owner: &AccountId) -> Balance {
+           *self.balances.get(owner).unwrap_or(&0)
+        }
+
+        #[ink(message)]
+        fn transfer(&mut self, to: AccountId, value: Balance) -> bool {
+            let caller = self.env().caller();
+            self.transfer_from_to(caller, to ,value)
+        }
+
+        fn transfer_from_to(&mut self, from: AccountId, to: AccountId, value: Balance) -> bool {
+            let from_account_balance = self.balance_of_or_zero(&from);
+            if from_account_balance < value {
+                false
+            }
+            // from账户扣减
+            self.balances.insert(from, from_account_balance - value);
+            // to账户增加
+            let to_account_balance = self.balance_of_or_zero(&to);
+            self.balances.insert(to, to_account_balance + value);
+
+            self.env().emit_event(Transfer {
+                from: Some(from),
+                to: Some(to),
+                value,
+            });
+
+            true
+        }
+
     }
 
     /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
